@@ -17,10 +17,12 @@ def normalize_text(text):
 
 def preprocess_data(text_data:str)->pd.DataFrame:
 
-    # Remove STOPWORDS
-    text_data = text_data.apply(lambda x: ' '.join([word for word in x.split() if word not in (ENGLISH_STOP_WORDS)]))
+    text_data = text_data.lower()
 
-    normalized_text= normalize_text(text_data)
+    # Remove STOPWORDS
+    text_no_stopwords = ' '.join([word for word in text_data.split() if word not in (ENGLISH_STOP_WORDS)])
+
+    normalized_text= normalize_text(text_no_stopwords)
 
     # Preprocess the data
     return normalized_text
