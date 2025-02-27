@@ -18,5 +18,6 @@ def load_data(json_file):
     ])
 
     df['label'] = df['labels_task1'].apply(lambda x: max(x, key=x.count))
+    df['label'] = df['label'].apply(lambda x: 0 if x == 'NO' else 1)
     df.drop('labels_task1', axis=1, inplace=True)
     return df
