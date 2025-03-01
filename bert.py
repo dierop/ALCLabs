@@ -11,7 +11,7 @@ from sklearn.model_selection import StratifiedKFold
 
 # Configuración
 MODEL_NAME = "dccuchile/bert-base-spanish-wwm-cased"  # BERT en español
-MAX_LENGTH = 128  
+MAX_LENGTH = 128
 BATCH_SIZE = 8
 EPOCHS = 1
 LEARNING_RATE = 2e-5
@@ -21,6 +21,7 @@ tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
 
 class TweetDataset(Dataset):
     """Dataset para tweets con BERT."""
+
     def __init__(self, texts, labels, tokenizer, max_length):
         self.texts = texts
         self.labels = labels
@@ -51,7 +52,7 @@ class TweetDataset(Dataset):
 
 def train_bert_kfold(train_data, K=5):
     """Entrena un modelo BERT usando validación cruzada K-Fold y devuelve predicciones."""
-    
+
     X = train_data["tweet"].tolist()
     y = train_data["label"].tolist()
 
@@ -81,7 +82,12 @@ def train_bert_kfold(train_data, K=5):
 
         optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
         num_training_steps = len(train_loader) * EPOCHS
-        lr_scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps)
+        lr_scheduler = get_scheduler(
+            "linear",
+            optimizer=optimizer,
+            num_warmup_steps=0,
+            num_training_steps=num_training_steps,
+        )
 
         # Entrenamiento
         for epoch in range(EPOCHS):
