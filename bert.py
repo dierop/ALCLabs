@@ -7,10 +7,11 @@ from transformers import get_scheduler
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import StratifiedKFold
 
 # Configuración
 MODEL_NAME = "dccuchile/bert-base-spanish-wwm-cased"  # BERT en español
-MAX_LENGTH = 128  
+MAX_LENGTH = 128
 BATCH_SIZE = 8
 EPOCHS = 1
 LEARNING_RATE = 2e-5
@@ -20,6 +21,7 @@ tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
 
 class TweetDataset(Dataset):
     """Dataset para tweets con BERT."""
+
     def __init__(self, texts, labels, tokenizer, max_length):
         self.texts = texts
         self.labels = labels
@@ -48,57 +50,82 @@ class TweetDataset(Dataset):
         }
 
 
-def train_bert(train_data_path):
-    """Carga los datos y entrena BERT para clasificación de tweets."""
-    train_data = load_data(train_data_path)
-    train_data['tweet'] = train_data['tweet'].apply(preprocess_data)
+def train_bert_kfold(train_data, K=5):
+    """Entrena un modelo BERT usando validación cruzada K-Fold y devuelve predicciones."""
 
     X = train_data["tweet"].tolist()
     y = train_data["label"].tolist()
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    skf = StratifiedKFold(n_splits=K, shuffle=True, random_state=42)
 
-    train_dataset = TweetDataset(X_train, y_train, tokenizer, MAX_LENGTH)
-    test_dataset = TweetDataset(X_test, y_test, tokenizer, MAX_LENGTH)
-
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
-
-    model = BertForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
-    model.train()
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
-    num_training_steps = len(train_loader) * EPOCHS
-    lr_scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps)
+    all_predictions = np.zeros(len(y))  # Para almacenar todas las predicciones
+    fold_accuracies = []
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model.to(device)
 
-    for epoch in range(EPOCHS):
-        print(f"\n🔹 Epoch {epoch + 1}/{EPOCHS}")
+    for fold, (train_idx, test_idx) in enumerate(skf.split(X, y)):
+        print(f"\n🔹 Fold {fold + 1}/{K}")
+
+        X_train, X_test = [X[i] for i in train_idx], [X[i] for i in test_idx]
+        y_train, y_test = [y[i] for i in train_idx], [y[i] for i in test_idx]
+
+        train_dataset = TweetDataset(X_train, y_train, tokenizer, MAX_LENGTH)
+        test_dataset = TweetDataset(X_test, y_test, tokenizer, MAX_LENGTH)
+
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+        # Inicializar modelo
+        model = BertForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
+        model.to(device)
         model.train()
 
-        for batch in train_loader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
-            loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
+        optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+        num_training_steps = len(train_loader) * EPOCHS
+        lr_scheduler = get_scheduler(
+            "linear",
+            optimizer=optimizer,
+            num_warmup_steps=0,
+            num_training_steps=num_training_steps,
+        )
 
-    model.eval()
-    predictions, true_labels = [], []
+        # Entrenamiento
+        for epoch in range(EPOCHS):
+            print(f"\n🟢 Epoch {epoch + 1}/{EPOCHS} - Fold {fold + 1}")
+            model.train()
 
-    with torch.no_grad():
-        for batch in test_loader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            logits = outputs.logits
-            predictions.extend(torch.argmax(logits, dim=-1).cpu().numpy())
-            true_labels.extend(batch["labels"].cpu().numpy())
+            for batch in train_loader:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = model(**batch)
+                loss = outputs.loss
+                loss.backward()
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
 
-    accuracy = accuracy_score(true_labels, predictions)
-    print(f"\n✅ Accuracy de BERT: {accuracy:.4f}")
+        # Evaluación en test set del fold
+        model.eval()
+        fold_predictions, true_labels = [], []
 
-    return model, accuracy
+        with torch.no_grad():
+            for batch in test_loader:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = model(**batch)
+                logits = outputs.logits
+                fold_predictions.extend(torch.argmax(logits, dim=-1).cpu().numpy())
+                true_labels.extend(batch["labels"].cpu().numpy())
+
+        # Calcular precisión para este fold
+        accuracy = accuracy_score(true_labels, fold_predictions)
+        fold_accuracies.append(accuracy)
+        print(f"✅ Accuracy del Fold {fold + 1}: {accuracy:.4f}")
+
+        # Guardar predicciones en la posición correcta
+        for i, idx in enumerate(test_idx):
+            all_predictions[idx] = fold_predictions[i]
+
+    # Promedio de accuracy en todos los folds
+    mean_accuracy = np.mean(fold_accuracies)
+    print(f"\n🔹 Accuracy promedio en {K}-Fold: {mean_accuracy:.4f}")
+
+    return all_predictions, mean_accuracy
