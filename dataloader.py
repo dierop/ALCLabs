@@ -13,7 +13,7 @@ def load_data(json_file):
         data = json.load(f)
 
     df = pd.DataFrame([
-        {'tweet': v['tweet'], 'labels_task1': v['labels_task1']}
+        {'tweet': v['tweet'], 'labels_task1': v['labels_task1'], "id": v["id_EXIST"]}
         for k, v in data.items()
     ])
 

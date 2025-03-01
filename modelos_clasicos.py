@@ -8,25 +8,20 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 
-def train_model(train_data_path, model_type="svm"):
+def get_model( model_type="svm"):
     """
     Carga los datos, preprocesa y entrena el modelo especificado.
     
     Parámetros:
-    - train_data_path: Ruta del dataset.
     - model_type: Tipo de modelo a entrenar ("rf", "xgb", "logreg", "nb").
 
     Retorna:
-    - Modelo entrenado, matriz X de características y etiquetas y.
+    - Modelo entrenado, vectorizador.
     """
-    train_data = load_data(train_data_path)
-    train_data['tweet'] = train_data['tweet'].apply(preprocess_data)
-
-    X = train_data["tweet"]
-    y = train_data["label"]
+    
 
     vectorizer = TfidfVectorizer(max_features=5000)
-    X = vectorizer.fit_transform(X)
+   
 
     # Seleccionar modelo
     if model_type == "rf":
@@ -42,6 +37,4 @@ def train_model(train_data_path, model_type="svm"):
     else:
         raise ValueError("Modelo no soportado. Usa 'rf', 'xgb', 'logreg', o 'nb'.")
 
-    model.fit(X, y)
-
-    return model, X, y, vectorizer
+    return model, vectorizer
