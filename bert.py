@@ -13,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 MODEL_NAME = "dccuchile/bert-base-spanish-wwm-cased"  # BERT en español
 MAX_LENGTH = 128
 BATCH_SIZE = 8
-EPOCHS = 1
+EPOCHS = 3
 LEARNING_RATE = 2e-5
 
 tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
