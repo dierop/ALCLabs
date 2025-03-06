@@ -25,3 +25,8 @@ def cross_validation(df, model, vectorizer, k_folds=5):
     y_pred = cross_val_predict(model, X, y, cv=skf)
 
     return y_pred
+
+
+def train_predict(df, model, vectorizer, x_test):
+    model.fit(vectorizer.fit_transform(df["tweet"]), df["label"])
+    return model.predict(vectorizer.transform(x_test))
