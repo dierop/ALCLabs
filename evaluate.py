@@ -4,7 +4,7 @@ from pyevall.metrics.metricfactory import MetricFactory
 import numpy as np
 
 
-def store_results(id, y_pred, model_name):
+def store_results(id, y_pred, model_name, path="outputs"):
     """
     Store results in a CSV file
     args:
@@ -19,17 +19,16 @@ def store_results(id, y_pred, model_name):
         }
     )
 
-    path = f"outputs/{model_name}.json"
+    path = f"{path}/{model_name}.json"
     with open(path, "w", encoding="utf-8") as f:
         f.write(preds.to_json(orient="records"))
 
     return path
 
 
-def get_scores(path):
+def get_scores(path_preds, labels="data/golds_task1_exist2025/training.json"):
     test = PyEvALLEvaluation()
-    preds = path
-    labels = "data/golds_task1_exist2025/training.json"
+    preds = path_preds
     metrics = [
         MetricFactory.Accuracy.value,
         MetricFactory.FMeasure.value,

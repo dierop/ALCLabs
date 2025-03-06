@@ -1,5 +1,5 @@
 import pandas as pd
-from cross_validation import cross_validation
+from train import cross_validation
 from modelos_clasicos import get_model
 from bert import train_bert_kfold
 from dataloader import load_data
@@ -21,7 +21,7 @@ if PREPROCCES:
 for model_type in models:
     print(f"\n🔹 Evaluando modelo: {model_type.upper()}")
 
-    if model_type == "bert":
+    if "bert" in model_type:
         y_pred, _ = train_bert_kfold(train_data, FOLDS)
     else:
         model, vectorizer = get_model(model_type)

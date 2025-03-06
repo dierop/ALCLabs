@@ -129,3 +129,58 @@ def train_bert_kfold(train_data, K=5):
     print(f"\n🔹 Accuracy promedio en {K}-Fold: {mean_accuracy:.4f}")
 
     return all_predictions, mean_accuracy
+
+
+def train_predict_bert(train_data, x_test):
+    """Entrena un modelo BERT y devuelve predicciones para un conjunto de test."""
+
+    X_train = train_data["tweet"].tolist()
+    y_train = train_data["label"].tolist()
+
+    train_dataset = TweetDataset(X_train, y_train, tokenizer, MAX_LENGTH)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+
+    # Inicializar modelo
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model = BertForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
+    model.to(device)
+    model.train()
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    num_training_steps = len(train_loader) * EPOCHS
+    lr_scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+
+    # Entrenamiento
+    for epoch in range(EPOCHS):
+        print(f"\n🟢 Epoch {epoch + 1}/{EPOCHS}")
+        model.train()
+
+        for batch in train_loader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            loss = outputs.loss
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.zero_grad()
+
+    # Predicciones para el conjunto de test
+    model.eval()
+    test_dataset = TweetDataset(x_test, [0] * len(x_test), tokenizer, MAX_LENGTH)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    all_predictions = []
+
+    with torch.no_grad():
+        for batch in test_loader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            logits = outputs.logits
+            all_predictions.extend(torch.argmax(logits, dim=-1).cpu().numpy())
+
+    return all_predictions

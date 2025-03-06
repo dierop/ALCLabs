@@ -14,5 +14,5 @@ poetry install
 Finally, to run the static code analysis checks, use the following commands:
 
 ```bash
-poetry run ruff --fix .
+poetry run ruff format .
 poetry run black .
