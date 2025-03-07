@@ -39,7 +39,8 @@ def load_data_csv(csv_file):
         df: pd.DataFrame, DataFrame with columns 'tweet', 'id' and 'labels_task1'
     """
     df2 = pd.read_csv(csv_file)
-    df = df2[['meme_id','blip_caption']]
+    df = df2[['meme_id','blip_caption', 'misogynous']]
+    df = df.rename(columns={'meme_id': 'id', 'misogynous': 'label', 'blip_caption': 'text'})
 
     return df
 
