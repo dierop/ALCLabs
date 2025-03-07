@@ -1,41 +1,50 @@
 import pandas as pd
-from modelos_clasicos import get_model
-from bert import train_bert_kfold
-from dataloader import load_data
+from sklearn.svm import SVC
+from dataloader import load_data_json, load_test_json, load_data_csv
 from preprocess import preprocess_data
-from evaluate import store_results, get_scores
 
+# Datos
 train_data_path = "Lab2/data/lab2_materials/dataset_task4_exist2025/training.json"
+train_data_path_blip = 'Lab2/data/lab2_materials/dataset_task4_exist2025/blip_captions_training.csv'
+train_data_path_mami = 'Lab2/data/mami_dataset/training_mami.csv'
 
-# Evaluamos modelos
-models = [ "rf", "xgb", "logreg", "nb", "svm"] #falta agregar bert
-PREPROCCES = True
-FOLDS = 3
+test_data_path = "Lab2/data/lab2_materials/dataset_task4_exist2025/test.json"
+test_data_path_blip = 'Lab2/data/lab2_materials/dataset_task4_exist2025/blip_captions_test.csv'
+test_data_path_mami = 'Lab2/data/mami_dataset/test_mami.csv'
+
+
+# Data Loader
+train_data = load_data_json(train_data_path)
+train_data_blip = load_data_csv(train_data_path_blip)
+train_data_mami = load_data_csv(train_data_path_mami)
+
+test_data = load_test_json(test_data_path)
+test_data_blip = load_data_csv(test_data_path_blip)
+test_data_mami = load_data_csv(test_data_path_mami)
+
+
+# Preprocesar datos
+train_data['text'] = train_data['text'].apply(preprocess_data)
+train_data_blip['blip_caption'] = train_data_blip['blip_caption'].apply(preprocess_data)
+train_data_mami['blip_caption'] = train_data_mami['blip_caption'].apply(preprocess_data)
+
+test_data['text'] = test_data['text'].apply(preprocess_data)
+test_data_blip['blip_caption'] = test_data_blip['blip_caption'].apply(preprocess_data)
+test_data_mami['blip_caption'] = test_data_mami['blip_caption'].apply(preprocess_data)
+
+
+
+"""
+model = SVC(kernel="linear", probability=True, random_state=42)
 results = []
 
-train_data = load_data(train_data_path)
-if PREPROCCES:
-    train_data["tweet"] = train_data["tweet"].apply(preprocess_data)
-
-for model_type in models:
-    print(f"\n🔹 Evaluando modelo: {model_type.upper()}")
-
-    if "bert" in model_type:
-        y_pred, _ = train_bert_kfold(train_data, FOLDS)
-    else:
-        model, vectorizer = get_model(model_type)
-        y_pred = cross_validation(train_data, model, vectorizer, FOLDS)
-    path = store_results(train_data["id"], y_pred, model_type)
-    ac, f1 = get_scores(path)
-    results.append(
-        {"Modelo": model_type.upper(), "Accuracy": round(ac, 4), "F1": round(f1, 4)}
-    )
 
 
 # # Guardar resultados en CSV
 df_results = pd.DataFrame(results)
-df_results.to_csv("resultados.csv", index=False)
+df_results.to_csv("Lab2/resultados.csv", index=False)
 
 # Mostrar resultados en consola
 print("\n📊 Comparación de Modelos:")
 print(df_results)
+"""

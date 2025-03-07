@@ -2,7 +2,7 @@ import json
 import pandas as pd
 
 
-def load_data(json_file):
+def load_data_json(json_file):
     """
     Load data from json file and return as pandas DataFrame
     args:
@@ -29,7 +29,22 @@ def load_data(json_file):
     df = df.reindex(columns=["id", "text", "label"])
     return df
 
-def load_test(json_file):
+
+def load_data_csv(csv_file):
+    """
+    Load data from csv file and return as pandas DataFrame
+    args:
+        csv_file: str, path to csv file
+    return:
+        df: pd.DataFrame, DataFrame with columns 'tweet', 'id' and 'labels_task1'
+    """
+    df2 = pd.read_csv(csv_file)
+    df = df2[['meme_id','blip_caption']]
+
+    return df
+
+
+def load_test_json(json_file):
     """
     Load data from json file and return as pandas DataFrame
     args:
@@ -49,5 +64,5 @@ def load_test(json_file):
             for _, v in data.items()
         ]
     )
-
+    df = df.reindex(columns=["id", "text"])
     return df
