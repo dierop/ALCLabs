@@ -1,6 +1,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, f1_score
+import numpy as np
 
 def train_and_evaluate_svc(X_train, y_train, X_test, y_test, kernel="linear"):
     """
@@ -26,7 +27,7 @@ def train_and_evaluate_svc(X_train, y_train, X_test, y_test, kernel="linear"):
     y_pred = svc_model.predict(X_test_tfidf)
 
     # Calcular métricas
-    accuracy = accuracy_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred, average="weighted")
+    accuracy = np.round(accuracy_score(y_test, y_pred), 4)
+    f1 = np.round(f1_score(y_test, y_pred, average="weighted"), 4)
 
     return accuracy, f1, svc_model, vectorizer 
