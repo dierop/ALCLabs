@@ -18,7 +18,7 @@ test_data_path = f"{path}lab2_materials/dataset_task4_exist2025/test.json"
 test_data_path_blip = f'{path}lab2_materials/dataset_task4_exist2025/blip_captions_test.csv'
 test_data_path_mami = f'{path}mami_dataset/test_mami.csv'
 
-def main(blip=0, mami=False, gen_test=False):
+def main(blip=0, mami=False, gen_test=False, type="SVC"):
     print("Blip: ", blip)
     print("Mami: ", mami)
     print("Gen Test: ", gen_test)
@@ -79,22 +79,25 @@ def main(blip=0, mami=False, gen_test=False):
         print("RF")
         print(accuracy_rf, f1_rf)
 
-        # Resultados BERT
-        accuracy_bert, f1_bert, y_preds = train_and_evaluate_bert(X_train.tolist(), y_train.tolist(), X_test.tolist(), y_test.tolist())
-        print(accuracy_bert, f1_bert)
+        # # Resultados BERT
+        # accuracy_bert, f1_bert, y_preds = train_and_evaluate_bert(X_train.tolist()[:5000], y_train.tolist()[:5000], X_test.tolist(), y_test.tolist())
+        # print(accuracy_bert, f1_bert)
     else:
         X_train = pd.concat([X_train, X_test], ignore_index=True)
         y_train = pd.concat([y_train, y_test], ignore_index=True)
+        if type == 'bert':
         # Resultados BERT
-        y_preds = train_and_evaluate_bert(X_train.tolist(), y_train.tolist(), test_data['text'].tolist())
-        store_results(test_data['id'], y_preds, "bert", path="outputs")
+            _,_,y_preds = train_and_evaluate_bert(X_train.tolist()[:5000], y_train.tolist()[:5000], test_data['text'].tolist())
+            store_results(test_data['id'], y_preds, "bert", path="outputs")
 
+        elif type == 'SVC':
         # Resultados SVC
-        y_preds = train_and_evaluate(X_train, y_train, test_data['text'], [], kernel="linear", tpye="SVC")
-        store_results(test_data['id'], y_preds, "svc", path="outputs")
+            _,_,y_preds = train_and_evaluate(X_train, y_train, test_data['text'], [], kernel="linear", tpye="SVC", pred=True)
+            store_results(test_data['id'], y_preds, "svc", path="outputs")
 
         # Resultados RF
-        y_preds = train_and_evaluate(X_train, y_train, test_data['text'], [], kernel="linear", tpye="RF")
-        store_results(test_data['id'], y_preds, "rf", path="outputs")
+        elif type == 'RF':
+            _,_,y_preds = train_and_evaluate(X_train, y_train, test_data['text'], [], kernel="linear", tpye="RF", pred=True)
+            store_results(test_data['id'], y_preds, "rf", path="outputs")
 
 

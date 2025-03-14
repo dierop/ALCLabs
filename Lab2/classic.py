@@ -4,7 +4,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score
 import numpy as np
 
-def train_and_evaluate(X_train, y_train, X_test, y_test, kernel="linear", tpye="SVC"):
+def train_and_evaluate(X_train, y_train, X_test, y_test, kernel="linear", tpye="SVC", pred=False):
     """
     Entrena un modelo SVC y lo evalúa en el conjunto de prueba.
     
@@ -27,8 +27,11 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, kernel="linear", tpye="
     # Hacer predicciones
     y_pred = model.predict(X_test_tfidf)
 
-    # Calcular métricas
-    accuracy = np.round(accuracy_score(y_test, y_pred), 4)
-    f1 = np.round(f1_score(y_test, y_pred, average="weighted"), 4)
+    if not pred:
+        # Calcular métricas
+        accuracy = np.round(accuracy_score(y_test, y_pred), 4)
+        f1 = np.round(f1_score(y_test, y_pred, average="weighted"), 4)
+    else:
+        accuracy, f1 = None, None
 
     return accuracy, f1, y_pred
