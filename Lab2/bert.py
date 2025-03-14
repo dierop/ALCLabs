@@ -115,4 +115,4 @@ def train_and_evaluate_bert(X_train, y_train, X_test, y_test, model_name="bert-b
     accuracy = np.round(accuracy_score(all_labels, all_preds), 4)
     f1 = np.round(f1_score(all_labels, all_preds, average="weighted"), 4)
 
-    return accuracy, f1, model, tokenizer
+    return accuracy, f1, all_preds 
