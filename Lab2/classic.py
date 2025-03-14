@@ -1,9 +1,10 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score
 import numpy as np
 
-def train_and_evaluate_svc(X_train, y_train, X_test, y_test, kernel="linear"):
+def train_and_evaluate(X_train, y_train, X_test, y_test, kernel="linear", tpye="SVC"):
     """
     Entrena un modelo SVC y lo evalúa en el conjunto de prueba.
     
@@ -20,14 +21,14 @@ def train_and_evaluate_svc(X_train, y_train, X_test, y_test, kernel="linear"):
     X_test_tfidf = vectorizer.transform(X_test)
 
     # Inicializar y entrenar el modelo SVC
-    svc_model = SVC(kernel=kernel)
-    svc_model.fit(X_train_tfidf, y_train)
+    model = SVC(kernel=kernel) if tpye == "SVC" else RandomForestClassifier(n_estimators=200, random_state=42)
+    model.fit(X_train_tfidf, y_train)
 
     # Hacer predicciones
-    y_pred = svc_model.predict(X_test_tfidf)
+    y_pred = model.predict(X_test_tfidf)
 
     # Calcular métricas
     accuracy = np.round(accuracy_score(y_test, y_pred), 4)
     f1 = np.round(f1_score(y_test, y_pred, average="weighted"), 4)
 
-    return accuracy, f1, svc_model, vectorizer 
+    return accuracy, f1, y_pred
