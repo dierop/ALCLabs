@@ -44,6 +44,20 @@ def load_data_csv(csv_file):
 
     return df
 
+def load_blip_csv(csv_file):
+    """
+    Load data from csv file and return as pandas DataFrame
+    args:
+        csv_file: str, path to csv file
+    return:
+        df: pd.DataFrame, DataFrame with columns 'tweet', 'id' and 'labels_task1'
+    """
+    df2 = pd.read_csv(csv_file)
+    df = df2[['meme_id','blip_caption']]
+    df = df.rename(columns={'meme_id': 'id', 'blip_caption': 'text'})
+
+    return df
+
 
 def load_test_json(json_file):
     """

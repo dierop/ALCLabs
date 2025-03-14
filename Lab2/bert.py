@@ -46,7 +46,7 @@ class BertClassifier(nn.Module):
         return self.fc(dropped)
 
 # 3️⃣ Función de entrenamiento y evaluación
-def train_and_evaluate_bert(X_train, y_train, X_test, y_test, model_name="bert-base-uncased", epochs=3, batch_size=8, lr=2e-5):
+def train_and_evaluate_bert(X_train, y_train, X_test, y_test, model_name="bert-base-uncased", epochs=3, batch_size=8, lr=2e-5, pred=False):
     """
     Entrena un modelo basado en BERT y lo evalúa en el conjunto de prueba.
     
@@ -111,8 +111,10 @@ def train_and_evaluate_bert(X_train, y_train, X_test, y_test, model_name="bert-b
 
             all_preds.extend(preds)
             all_labels.extend(labels.cpu().numpy())
-
+    
+    if pred:
+        return None, None, all_preds
     accuracy = np.round(accuracy_score(all_labels, all_preds), 4)
     f1 = np.round(f1_score(all_labels, all_preds, average="weighted"), 4)
 
-    return accuracy, f1, model, tokenizer
+    return accuracy, f1, all_preds 
