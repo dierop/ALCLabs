@@ -9,9 +9,9 @@ from evaluate import store_results
 # Datos
 path = "data/" # add Lab2/data if run from outisde Lab2
 train_data_path = f"{path}dataset_task3_exist2025/training.json"
-test_data_path = f"{path}/dataset_task3_exist2025/test.json"
+test_data_path = f"{path}dataset_task3_exist2025/test.json"
 
-def main(language=["EN"], gen_test=False):
+def main(language=["EN"], gen_test=False, model_name='hate-speech-CNERG/bert-base-uncased-hatexplain'):
     # Data Loader
     train_data_meme = load_data_json(train_data_path)
 
@@ -19,13 +19,16 @@ def main(language=["EN"], gen_test=False):
     test_data = load_test_json(test_data_path)
 
     if len(language) == 2:
-        model = "bert-base-uncased"
+        # model = "bert-base-uncased"
+        pass
     elif "EN" in language:
-        model = ""
-        train_data_meme = train_data_meme[train_data_meme['split']=='EN']
+        # model = "bert-base-uncased"
+        train_data_meme = train_data_meme[train_data_meme['split']=='TRAIN-VIDEO_EN']
+        train_data_meme = train_data_meme.reindex(columns=["id", "text", "label"])
     else:
-        model = ""
-        train_data_meme = train_data_meme[train_data_meme['split']=='ES']
+        # model = "dccuchile/bert-base-spanish-wwm-cased"
+        train_data_meme = train_data_meme[train_data_meme['split']=='TRAIN-VIDEO_ES']
+        train_data_meme = train_data_meme.reindex(columns=["id", "text", "label"])
         
 
     # Preprocesar datos
