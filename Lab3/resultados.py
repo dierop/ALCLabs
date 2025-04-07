@@ -39,19 +39,19 @@ def main(language=["EN"], gen_test=False, model_name='hate-speech-CNERG/bert-bas
     # Consolidado
     X = train_data_meme['text']
     y = train_data_meme['label']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42,)
 
 
     if not gen_test:
 
         # Resultados BERT
-        accuracy_bert, f1_bert, y_preds = train_and_evaluate_bert(X_train.tolist(), y_train.tolist(), X_test.tolist(), y_test.tolist())
+        accuracy_bert, f1_bert, y_preds = train_and_evaluate_bert(X_train.tolist(), y_train.tolist(), X_test.tolist(), y_test.tolist(), epochs=5, model_name=model_name)
         print(accuracy_bert, f1_bert)
     else:
+        print("Generando test")
         X_train = pd.concat([X_train, X_test], ignore_index=True)
         y_train = pd.concat([y_train, y_test], ignore_index=True)
-        if type == 'bert':
-        # Resultados BERT
-            _,_,y_preds = train_and_evaluate_bert(X_train.tolist(), y_train.tolist(), test_data['text'].tolist())
-            store_results(test_data['id'], y_preds, "bert", path="outputs")
+
+        _,_,y_preds = train_and_evaluate_bert(X_train.tolist(), y_train.tolist(), test_data['text'].tolist(),  [0] * len(test_data['text']), epochs=5, pred=True, model_name=model_name)
+        store_results(test_data['id'], y_preds, model_name, path="outputs")
 

@@ -87,7 +87,7 @@ def main(blip=0, mami=False, gen_test=False, type="SVC"):
         y_train = pd.concat([y_train, y_test], ignore_index=True)
         if type == 'bert':
         # Resultados BERT
-            _,_,y_preds = train_and_evaluate_bert(X_train.tolist()[:5000], y_train.tolist()[:5000], test_data['text'].tolist())
+            _,_,y_preds = train_and_evaluate_bert(X_train.tolist()[:5000], y_train.tolist()[:5000], test_data['text'].tolist(), [0] * len(test_data['text']))
             store_results(test_data['id'], y_preds, "bert", path="outputs")
 
         elif type == 'SVC':
