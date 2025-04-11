@@ -25,10 +25,16 @@ def main(language=["EN"], gen_test=False, model_name='hate-speech-CNERG/bert-bas
         # model = "bert-base-uncased"
         train_data_meme = train_data_meme[train_data_meme['split']=='TRAIN-VIDEO_EN']
         train_data_meme = train_data_meme.reindex(columns=["id", "text", "label"])
+        test_data = test_data[test_data['split']=='DEV-VIDEO_EN']
+        test_data = test_data.reindex(columns=["id", "text", "label"])
+        print("Len EN", len(train_data_meme))
     else:
         # model = "dccuchile/bert-base-spanish-wwm-cased"
         train_data_meme = train_data_meme[train_data_meme['split']=='TRAIN-VIDEO_ES']
         train_data_meme = train_data_meme.reindex(columns=["id", "text", "label"])
+        test_data = test_data[test_data['split']=='DEV-VIDEO_ES']
+        test_data = test_data.reindex(columns=["id", "text", "label"])
+        print("Len ES", len(train_data_meme))
         
 
     # Preprocesar datos
