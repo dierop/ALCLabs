@@ -7,11 +7,13 @@ from sklearn.metrics import (
     f1_score, log_loss, accuracy_score
 )
 from datasets import Dataset
-from collections import Counter
+
 import torch
 import numpy as np
-import pandas as pd
+
 from dataloader import load_data_json
+from typing import List, Dict, Any
+import json
 
 class BertTrainerWrapper:
     def __init__(self, df=None, label_name="label1", soft=False, model_name="bert-base-multilingual-cased", split = True):
@@ -226,3 +228,79 @@ class BertTrainerWrapper:
         else:
             pred_ids = logits.argmax(-1).cpu().numpy()
             return self.label_encoder.inverse_transform(pred_ids)
+
+    def build_submission(
+        self,
+        threshold: float = 0.5,
+        test_case: str = "EXIST2025",
+        return_probabilities: bool = True,
+        model_name: str = None,
+        task_name: str = "soft_3_1",
+    ) -> List[Dict[str, Any]]:
+        """
+        label_name ..... 'label1', 'label2' o 'label3'
+        threshold ...... umbral para convertir prob→etiqueta (solo hard multietiqueta)
+        test_case ...... literal a incluir en cada JSON
+        return_probabilities
+            soft=True  -> dict de probabilidades (como tus ejemplos) si True,
+                        lista de etiquetas si False
+            soft=False -> se ignora; siempre lista/str de etiquetas duras
+        """
+        # ------------------------------------------------------
+        # 1. Normalizar samples a lista ordenada [ {"id":..,"text":..}, ... ]
+        # ------------------------------------------------------
+        data=load_data_json("data/EXIST2025_training_videos.json")
+
+        # DAta is a pandas dataframe
+
+        texts = data['text'].tolist()
+        ids = data['id'].tolist()
+        # ------------------------------------------------------
+        # 2. Inferencia
+        # ------------------------------------------------------
+        preds = [self.predict(
+            p,
+            threshold=threshold,
+            return_probabilities=return_probabilities
+        ) for p in texts]
+
+        # ------------------------------------------------------
+        # 3. Empaquetar resultado por muestra
+        # ------------------------------------------------------
+        outputs = []
+        for s, p in zip(ids, preds):
+            # p puede ser:
+            #   • dict  -> probabilidades por clase
+            #   • list  -> lista de etiquetas duras
+            #   • int/str -> etiqueta única (hard-single)
+            #   • float -> prob. binaria (soft escalar)
+            value: Any
+            if isinstance(p, list):
+                value = p
+                if isinstance(p[0], dict):
+                    # soft multi-label
+                    # if k=='-' convertimos a 'NO'
+                    value = {k if k != "-" else 'NO': v for k, v in p[0].items()}
+                        
+            elif isinstance(p,  str):
+                value = p
+            elif isinstance(p, np.ndarray):
+                value=  p[0]
+                value = 'NO' if value  == '-' else value     
+
+            outputs.append(
+                {
+                    "test_case": test_case,
+                    "id": s,
+                    "value": value,
+                }
+            )
+
+        # save to json
+        if model_name is None:
+            model_name = self.model_name.split("/")[-1]
+        output_file = f"{model_name}_{task_name}.json"
+        with open(output_file, "w") as f:
+            json.dump(outputs, f, indent=4, ensure_ascii=False)
+        print(f"Submission saved to {output_file}")
+        return outputs

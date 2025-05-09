@@ -106,10 +106,9 @@ def load_test_json(json_file):
             {
                 "text": v["text"],
                 "id": v["id_EXIST"],
-                "split": v["split"],
             }
             for _, v in data.items()
         ]
     )
-    df = df.reindex(columns=["id", "text","split"])
+    df = df.reindex(columns=["id", "text"])
     return df
