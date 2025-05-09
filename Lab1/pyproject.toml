@@ -12,8 +12,9 @@ pandas = "^2.2.0"
 scikit-learn = "^1.6.1"
 xgboost = "^2.1.4"
 torch = "^2.6.0"
-transformers = "^4.49.0"
+transformers = {extras = ["torch"], version = "^4.51.3"}
 pyevall = "0.1.71"
+datasets = "^3.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
