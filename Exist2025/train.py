@@ -94,6 +94,7 @@ class BertTrainerWrapper:
     # ------------------------------------------------------------------
     def tokenize_dataset(self):
         ds = Dataset.from_pandas(self.df[["text", "labels"]])
+        ds = ds.train_test_split(test_size=0.15, shuffle=True)
         ds = ds.map(lambda x: self.tokenizer(
             x["text"], truncation=True, padding="max_length",
             max_length=128), batched=False)
@@ -113,7 +114,8 @@ class BertTrainerWrapper:
     # ------------------------------------------------------------------
     # 4. ENTRENAR
     # ------------------------------------------------------------------
-    def train(self, epochs=3, batch_size=8, lr=2e-5):
+    def train(self, epochs=3, batch_size=8, lr=2e-5, eval_batch_size=2, 
+              eval_accumulation_steps=32):
         self.prepare_labels()
         self.tokenize_dataset()
         self.build_model()
@@ -124,13 +126,15 @@ class BertTrainerWrapper:
             per_device_train_batch_size=batch_size,
             num_train_epochs=epochs,
             weight_decay=0.01,
+            per_device_eval_batch_size = eval_batch_size,
+            eval_accumulation_steps    = eval_accumulation_steps,
         )
 
         self.trainer = Trainer(
             model=self.model,
             args=args,
-            train_dataset=self.dataset,
-            eval_dataset=self.dataset,
+            train_dataset=self.dataset['train'],
+            eval_dataset=self.dataset['test'],
             tokenizer=self.tokenizer,
             compute_metrics=self.compute_metrics
         )
