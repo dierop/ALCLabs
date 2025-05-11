@@ -106,7 +106,8 @@ class BertTrainerWrapper:
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name,
             num_labels=self.num_labels,
-            problem_type=self.problem_type
+            problem_type=self.problem_type,
+            ignore_mismatched_sizes=True
         )
 
     # ------------------------------------------------------------------
