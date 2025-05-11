@@ -17,11 +17,16 @@ def get_majority_label3(label_list_of_lists):
     flat = [item for sublist in label_list_of_lists for item in sublist]
     if not flat:
         return None
+    
     counts = Counter(flat)
-    most_common_label, count = counts.most_common(1)[0]
-    if count > len(flat) / 2:
-        return most_common_label
-    return None
+    # Filtra las etiquetas con count > 1
+    repeated = [label for label, cnt in counts.items() if cnt > 1]
+
+    if not repeated:          # lista vacía  →  no hay ninguna repetida
+        return None
+
+
+    return repeated
 
 
 

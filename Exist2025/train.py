@@ -15,73 +15,93 @@ from dataloader import load_data_json
 from typing import List, Dict, Any
 import json
 
-class BertTrainerWrapper:
-    def __init__(self, df=None, label_name="label1", soft=False, model_name="bert-base-multilingual-cased", split = True):
+from transformers import (
+    AutoTokenizer, AutoModelForSequenceClassification,
+    TrainingArguments, Trainer
+)
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import f1_score, accuracy_score, log_loss
+from datasets import Dataset
+from collections import Counter, defaultdict
+import torch, numpy as np, pandas as pd
 
+class BertTrainerWrapper:
+    def __init__(self, df=None, label_name="label1", soft=False,
+                 model_name="bert-base-multilingual-cased"):
         if df is None:
             df = load_data_json("data/EXIST2025_training_videos.json", soft=soft)
         self.df = df.dropna(subset=[label_name]).reset_index(drop=True)
         self.label_name = label_name
         self.soft = soft
         self.model_name = model_name
+
         self.label_encoder = None
         self.keys = None
         self.num_labels = None
         self.problem_type = None
-        self.is_regression = False
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = None
         self.dataset = None
-        self.split = split
-    
-    def prepare_labels(self):
+        self.trainer = None
+
+    # ------------------------------------------------------------------
+    # 1. PREPARAR ETIQUETAS
+    # ------------------------------------------------------------------
+    def prepare_labels(self, threshold=0.5):
+        col = self.df[self.label_name]
+
+        # -------- SOFT -------------------------------------------------
         if self.soft:
-            # --- soft binario como diccionario {"YES":p, "NO":1-p}
-            if isinstance(self.df[self.label_name].iloc[0], dict):
-                self.keys = sorted(set().union(
-                    *self.df[self.label_name].apply(lambda x: x.keys())))
-                self.df["labels"] = self.df[self.label_name].apply(
+            # dict → vector
+            if isinstance(col.iloc[0], dict):
+                self.keys = sorted(set().union(*col.apply(lambda x: x.keys())))
+                self.df["labels"] = col.apply(
                     lambda d: [d.get(k, 0.0) for k in self.keys])
                 self.num_labels = len(self.keys)
                 self.problem_type = "multi_label_classification"
+
+            # float → regresión binaria
             else:
-                # soft escalar (ej. 0.75)  ➞ regresión
-                self.df["labels"] = self.df[self.label_name].astype(float)
+                self.df["labels"] = col.astype(float)
                 self.num_labels = 1
                 self.problem_type = "regression"
-                self.is_regression = True
-        else:
-            # --- hard: una sola clase string ➞ entero
-            self.label_encoder = LabelEncoder()
-            self.df["labels"] = self.label_encoder.fit_transform(
-                self.df[self.label_name])
-            self.num_labels = len(self.label_encoder.classes_)
-            self.problem_type = "single_label_classification"
 
-    def prepare_labels(self):
-        if self.soft:
-            # Soft: dict → vector
-            self.keys = sorted(set().union(*self.df[self.label_name].apply(lambda x: x.keys())))
-            def label_to_vec(d):
-                return [d.get(k, 0.0) for k in self.keys]
-            self.df["labels"] = self.df[self.label_name].apply(label_to_vec)
-            self.num_labels = len(self.keys)
+            return  # fin SOFT
+
+        # -------- HARD -------------------------------------------------
+        # HARD MULTI-LABEL  (lista de etiquetas)
+        if isinstance(col.iloc[0], (list, set)):
+            # multi-label hard  → vector multihot float
+            self.keys = sorted(set().union(*col))
+
+            def to_multihot(lst):
+                return [float(1) if k in lst else float(0) for k in self.keys]  # 🆕 float
+
+            self.df["labels"] = col.apply(to_multihot)
+            self.num_labels   = len(self.keys)
             self.problem_type = "multi_label_classification"
+
+        # HARD SINGLE-LABEL  (cadena)
         else:
-            # Hard: class → encoded int
             self.label_encoder = LabelEncoder()
-            self.df["labels"] = self.label_encoder.fit_transform(self.df[self.label_name])
+            self.df["labels"] = self.label_encoder.fit_transform(col)
             self.num_labels = len(self.label_encoder.classes_)
             self.problem_type = "single_label_classification"
 
+    # ------------------------------------------------------------------
+    # 2. TOKENIZAR
+    # ------------------------------------------------------------------
     def tokenize_dataset(self):
         ds = Dataset.from_pandas(self.df[["text", "labels"]])
-        if self.split:
-            ds= ds.train_test_split(test_size=0.2, shuffle=True, seed=42)
         ds = ds.map(lambda x: self.tokenizer(
-            x["text"], truncation=True, padding="max_length", max_length=128), batched=False)
+            x["text"], truncation=True, padding="max_length",
+            max_length=128), batched=False)
         self.dataset = ds
 
+    # ------------------------------------------------------------------
+    # 3. CONSTRUIR MODELO
+    # ------------------------------------------------------------------
     def build_model(self):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name,
@@ -89,13 +109,15 @@ class BertTrainerWrapper:
             problem_type=self.problem_type
         )
 
-    def train(self, output_dir="./results", epochs=1, batch_size=8, lr=2e-5):
+    # ------------------------------------------------------------------
+    # 4. ENTRENAR
+    # ------------------------------------------------------------------
+    def train(self, epochs=3, batch_size=8, lr=2e-5):
         self.prepare_labels()
         self.tokenize_dataset()
         self.build_model()
 
         args = TrainingArguments(
-            output_dir=output_dir,
             eval_strategy="epoch",
             learning_rate=lr,
             per_device_train_batch_size=batch_size,
@@ -103,118 +125,107 @@ class BertTrainerWrapper:
             weight_decay=0.01,
         )
 
-        trainer = Trainer(
+        self.trainer = Trainer(
             model=self.model,
             args=args,
-            train_dataset=self.dataset["train"] if self.split else self.dataset,
-            eval_dataset=self.dataset['test'] if self.split else self.dataset,
+            train_dataset=self.dataset,
+            eval_dataset=self.dataset,
             tokenizer=self.tokenizer,
             compute_metrics=self.compute_metrics
         )
 
-        trainer.train()
-    
+        self.trainer.train()
+
+    # ------------------------------------------------------------------
+    # 5. MÉTRICAS
+    # ------------------------------------------------------------------
     def compute_metrics(self, eval_pred, th=0.5):
-        """
-        th: umbral usado tanto para binarizar y_true como y_pred
-            cuando calculamos F1 en modo soft
-        """
         logits, labels = eval_pred
 
-        # ---------------- SOFT ------------------------------------------
+        # ---------------- SOFT ----------------------------------------
         if self.soft:
             probs = torch.sigmoid(torch.tensor(logits)).cpu().numpy()
 
-            # -------- BINARIO soft (num_labels = 1) ----------
+            # Soft binario
             if self.num_labels == 1:
-                y_true = labels.squeeze()          # continua [0..1]
-                y_pred = probs.squeeze()           # continua [0..1]
-
-                y_true_hard = (y_true >= th).astype(int)
-                y_pred_hard = (y_pred >= th).astype(int)
+                y_true = labels.squeeze()
+                y_pred = probs.squeeze()
+                y_true_h = (y_true >= th).astype(int)
+                y_pred_h = (y_pred >= th).astype(int)
 
                 return {
-                    "mae":       float(np.mean(np.abs(y_pred - y_true))),
-                    "logloss":   float(log_loss(y_true_hard, y_pred)),
-                    "f1_micro":  float(f1_score(y_true_hard, y_pred_hard,
-                                                average="micro")),
-                    "f1_macro":  float(f1_score(y_true_hard, y_pred_hard,
-                                                average="macro")),
+                    "mae":     float(np.mean(np.abs(y_pred - y_true))),
+                    "logloss": float(log_loss(y_true_h, y_pred)),
+                    "f1_micro": float(f1_score(y_true_h, y_pred_h, average="micro")),
+                    "f1_macro": float(f1_score(y_true_h, y_pred_h, average="macro")),
                 }
 
-            # -------- MULTICLASE / MULTILABEL soft ------------
-            y_true = labels                       # continua
+            # Soft multilabel
+            y_true = labels
             y_pred = probs
+            y_true_h = (y_true >= th).astype(int)
+            y_pred_h = (y_pred >= th).astype(int)
 
-            y_true_hard = (y_true >= th).astype(int)
-            y_pred_hard = (y_pred >= th).astype(int)
-
-            micro_f1 = f1_score(
-                y_true_hard.reshape(-1),
-                y_pred_hard.reshape(-1),
-                average="micro",
-                zero_division=0,
-            )
-            macro_f1 = f1_score(
-                y_true_hard,
-                y_pred_hard,
-                average="macro",
-                zero_division=0,
-            )
             ce = np.mean([
-                log_loss(y_true_hard[:, k], y_pred[:, k])
+                log_loss(y_true_h[:, k], y_pred[:, k])
                 for k in range(self.num_labels)
             ])
+            micro_f1 = f1_score(
+                y_true_h.reshape(-1), y_pred_h.reshape(-1),
+                average="micro", zero_division=0)
+            macro_f1 = f1_score(
+                y_true_h, y_pred_h, average="macro", zero_division=0)
 
-            return {
-                "mae":       float(np.mean(np.abs(y_pred - y_true))),
-                "logloss":   float(ce),
-                "f1_micro":  float(micro_f1),
-                "f1_macro":  float(macro_f1),
-            }
+            return {"mae": float(np.mean(np.abs(y_pred - y_true))),
+                    "logloss": float(ce),
+                    "f1_micro": float(micro_f1),
+                    "f1_macro": float(macro_f1)}
 
-        # ---------------- HARD ------------------------------------------
-        else:
-            preds = np.argmax(logits, axis=-1)
-            acc = accuracy_score(labels, preds)
-            return {"accuracy": float(acc)}
+        # ---------------- HARD ----------------------------------------
+        if self.problem_type == "multi_label_classification":
+            probs = torch.sigmoid(torch.tensor(logits)).cpu().numpy()
+            y_true = labels
+            y_pred = (probs >= th).astype(int)
 
-    
+            micro_f1 = f1_score(
+                y_true.reshape(-1), y_pred.reshape(-1),
+                average="micro", zero_division=0)
+            macro_f1 = f1_score(
+                y_true, y_pred, average="macro", zero_division=0)
+
+            return {"f1_micro": float(micro_f1), "f1_macro": float(macro_f1)}
+
+        # HARD single-label
+        preds = np.argmax(logits, axis=-1)
+        return {"accuracy": float(accuracy_score(labels, preds))}
+
+    # ------------------------------------------------------------------
+    # 6. PREDICT FLEXIBLE
+    # ------------------------------------------------------------------
     @torch.no_grad()
     def predict(self, texts, threshold=0.5, return_probabilities=True):
-        """
-        texts: str o lista[str]
-        threshold: umbral para binarizar (solo soft)
-        return_probabilities:
-            • soft  -> True  ⇒ devuelve probabilidades
-            • soft  -> False ⇒ etiquetas (≥ threshold) / argmax
-            • hard  -> ignora, siempre devuelve etiquetas de clase
-        """
         if isinstance(texts, str):
             texts = [texts]
 
         toks = self.tokenizer(
-            texts,
-            return_tensors="pt",
-            truncation=True,
-            padding="max_length",
-            max_length=128,
+            texts, return_tensors="pt",
+            truncation=True, padding="max_length", max_length=128
         )
-
-        device = next(self.model.parameters()).device       # NEW: detecta dónde está el modelo
-        toks = {k: v.to(device) for k, v in toks.items()}   # NEW: mueve inputs a ese device
-        self.model.eval()                                   # NEW: modo evaluación
+        device = next(self.model.parameters()).device
+        toks = {k: v.to(device) for k, v in toks.items()}
+        self.model.eval()
 
         logits = self.model(**toks).logits
 
-        # ---------- casos ----------
+        # ---------- soft ---------------------------------------------
         if self.soft:
-            if self.num_labels == 1:  # soft binario
+            # binario soft
+            if self.num_labels == 1:
                 probs = torch.sigmoid(logits).squeeze().cpu().tolist()
                 return probs if return_probabilities else [
                     int(p >= threshold) for p in probs
                 ]
-
+            # multilabel soft
             probs = torch.sigmoid(logits).cpu().numpy()
             outputs = []
             for vec in probs:
@@ -222,12 +233,23 @@ class BertTrainerWrapper:
                 if return_probabilities:
                     outputs.append(d)
                 else:
-                    sel = [k for k, p in d.items() if p >= threshold] or [max(d, key=d.get)]
+                    sel = [k for k, p in d.items() if p >= threshold] or \
+                          [max(d, key=d.get)]
                     outputs.append(sel)
+            return outputs
+
+        # ---------- hard ---------------------------------------------
+        if self.problem_type == "multi_label_classification":
+            probs = torch.sigmoid(logits).cpu().numpy()
+            outputs = []
+            for vec in probs:
+                labels = [k for k, v in zip(self.keys, vec) if v >= threshold]
+                outputs.append(labels or [self.keys[np.argmax(vec)]])
             return outputs
         else:
             pred_ids = logits.argmax(-1).cpu().numpy()
             return self.label_encoder.inverse_transform(pred_ids)
+
 
     def build_submission(
         self,
@@ -235,7 +257,9 @@ class BertTrainerWrapper:
         test_case: str = "EXIST2025",
         return_probabilities: bool = True,
         model_name: str = None,
-        task_name: str = "soft_3_1",
+        task_name: str = "task3_3",
+        team_name: str = "ScalaR",
+        run:int=1,
     ) -> List[Dict[str, Any]]:
         """
         label_name ..... 'label1', 'label2' o 'label3'
@@ -296,10 +320,7 @@ class BertTrainerWrapper:
                 }
             )
 
-        # save to json
-        if model_name is None:
-            model_name = self.model_name.split("/")[-1]
-        output_file = f"{model_name}_{task_name}.json"
+        output_file = f'{task_name}_{"soft" if self.soft else "hard"}_{team_name}_{run}.json'
         with open(output_file, "w") as f:
             json.dump(outputs, f, indent=4, ensure_ascii=False)
         print(f"Submission saved to {output_file}")
