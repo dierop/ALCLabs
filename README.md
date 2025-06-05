@@ -1,5 +1,7 @@
 # 🎉 ALC Labs
-Laboratorios de la asigntaura ALC
+Laboratorios y proyectos de la asigntaura ALC
+Proyecto compartido
+Analisis de sexismo de la competicion Exist
 
 
 
