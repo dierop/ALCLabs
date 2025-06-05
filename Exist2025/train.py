@@ -11,7 +11,7 @@ from datasets import Dataset
 import torch
 import numpy as np
 
-from dataloader import load_data_json
+from dataloader import load_data_json, load_test_json
 from typing import List, Dict, Any
 import json
 
@@ -278,7 +278,7 @@ class BertTrainerWrapper:
         # ------------------------------------------------------
         # 1. Normalizar samples a lista ordenada [ {"id":..,"text":..}, ... ]
         # ------------------------------------------------------
-        data=load_data_json("data/EXIST2025_training_videos.json")
+        data=load_test_json("data/EXIST2025_test_clean.json")
 
         # DAta is a pandas dataframe
 
@@ -310,6 +310,10 @@ class BertTrainerWrapper:
                     # soft multi-label
                     # if k=='-' convertimos a 'NO'
                     value = {k if k != "-" else 'NO': v for k, v in p[0].items()}
+                    # normalizamos para que todas las probabilidades sumen 1
+                    total = sum(value.values())
+                    if total > 0:
+                        value = {k: v / total for k, v in value.items()}
                         
             elif isinstance(p,  str):
                 value = p
